@@ -60,3 +60,12 @@ Submission is recorded only after explicit user confirmation.
 Alfred does not upload assignments to course websites.
 
 The dashboard highlights finished assignments awaiting submission.
+
+## Deadline storage
+
+Tasks support an optional deadline stored as an ISO timestamp in UTC.
+Deadline updates require a datetime with timezone information.
+Deadlines can be cleared, and past deadlines are accepted.
+
+Database initialization adds the deadline column to existing databases
+without deleting tasks. Desktop deadline controls are the next step.

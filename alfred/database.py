@@ -1,4 +1,4 @@
-﻿"""Persistent task storage for Alfred."""
+"""Persistent task storage for Alfred."""
 
 import os
 import sqlite3
@@ -53,6 +53,16 @@ def initialize_database():
                     created_at TEXT NOT NULL
                 )
             """)
+
+
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(tasks)")
+            }
+            if "due_at" not in columns:
+                connection.execute(
+                    "ALTER TABLE tasks ADD COLUMN due_at TEXT"
+                )
 
 
 def create_task(title, course="", estimated_minutes=60,
@@ -160,3 +170,29 @@ def apply_task_action(task_id, action):
             ).fetchone()
 
             return dict(updated)
+
+
+def set_task_deadline(task_id, due_at):
+    """Save an aware datetime in UTC, or clear the deadline with None."""
+    if due_at is None:
+        stored_deadline = None
+    else:
+        if not isinstance(due_at, datetime):
+            raise ValueError("Deadline must be a datetime or None.")
+        if due_at.tzinfo is None or due_at.utcoffset() is None:
+            raise ValueError("Deadline must include a timezone.")
+        stored_deadline = due_at.astimezone(timezone.utc).isoformat()
+
+    with closing(connect()) as connection:
+        with connection:
+            cursor = connection.execute(
+                "UPDATE tasks SET due_at = ? WHERE id = ?",
+                (stored_deadline, task_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError("Task not found.")
+
+            row = connection.execute(
+                "SELECT * FROM tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+            return dict(row)
