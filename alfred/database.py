@@ -104,3 +104,59 @@ def list_tasks():
             "SELECT * FROM tasks ORDER BY id"
         ).fetchall()
         return [dict(row) for row in rows]
+
+
+def apply_task_action(task_id, action):
+    """Apply a valid task action and return the updated task."""
+    if action not in ("start", "finish", "submit"):
+        raise ValueError("Unknown task action.")
+
+    with closing(connect()) as connection:
+        with connection:
+            row = connection.execute(
+                "SELECT * FROM tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+
+            if row is None:
+                raise ValueError("Task not found.")
+
+            status = row["status"]
+            remaining = row["remaining_minutes"]
+
+            if action == "start":
+                if status != "not_started":
+                    raise ValueError("Only an unstarted task can be started.")
+                new_status = "in_progress"
+
+            elif action == "finish":
+                if status not in ("not_started", "in_progress"):
+                    raise ValueError("This task cannot be marked finished.")
+                new_status = (
+                    "ready_to_submit"
+                    if row["requires_submission"]
+                    else "completed"
+                )
+                remaining = 0
+
+            else:
+                if not row["requires_submission"]:
+                    raise ValueError("This task does not require submission.")
+                if status != "ready_to_submit":
+                    raise ValueError("Mark the task finished before submitting.")
+                new_status = "submitted"
+                remaining = 0
+
+            cursor = connection.execute("""
+                UPDATE tasks
+                SET status = ?, remaining_minutes = ?
+                WHERE id = ? AND status = ?
+            """, (new_status, remaining, task_id, status))
+
+            if cursor.rowcount != 1:
+                raise ValueError("The task changed. Refresh and try again.")
+
+            updated = connection.execute(
+                "SELECT * FROM tasks WHERE id = ?", (task_id,)
+            ).fetchone()
+
+            return dict(updated)

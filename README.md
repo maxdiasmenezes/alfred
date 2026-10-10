@@ -47,3 +47,16 @@ and summaries of active tasks and remaining effort.
 Tasks persist in the local SQLite database.
 
 Calendar integration and task status controls are upcoming features.
+
+## Task progress and submission
+
+Select a task and use Start, Finished, or Submitted.
+
+Assignments move from Not Started to In Progress, then
+Ready To Submit, and finally Submitted.
+
+Finishing a task without a submission requirement marks it Completed.
+Submission is recorded only after explicit user confirmation.
+Alfred does not upload assignments to course websites.
+
+The dashboard highlights finished assignments awaiting submission.

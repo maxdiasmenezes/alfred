@@ -1,4 +1,4 @@
-﻿"""Alfred's desktop task dashboard."""
+"""Alfred's desktop task dashboard."""
 
 import sqlite3
 import sys
@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from alfred.database import create_task, initialize_database, list_tasks
+from alfred.database import apply_task_action, create_task, initialize_database, list_tasks
 
 
 class AlfredWindow(QMainWindow):
@@ -41,6 +41,9 @@ class AlfredWindow(QMainWindow):
         heading.setStyleSheet("font-size: 28px; font-weight: bold;")
         layout.addWidget(heading)
         layout.addWidget(QLabel("Your tasks, organized in one place."))
+        self.submission_notice = QLabel()
+        self.submission_notice.setWordWrap(True)
+        layout.addWidget(self.submission_notice)
 
         self.summary = QLabel()
         layout.addWidget(self.summary)
@@ -110,6 +113,29 @@ class AlfredWindow(QMainWindow):
         )
         task_layout.addWidget(self.table)
 
+        action_bar = QHBoxLayout()
+
+        for label, action in (
+            ("Start", "start"),
+            ("Finished", "finish"),
+            ("Submitted", "submit"),
+        ):
+            button = QPushButton(label)
+            button.clicked.connect(
+                lambda checked=False, selected_action=action:
+                    self.change_task_status(selected_action)
+            )
+            action_bar.addWidget(button)
+
+        task_layout.addLayout(action_bar)
+
+        help_text = QLabel(
+            "Select a task before choosing an action. "
+            "Finished assignments still need submission."
+        )
+        help_text.setWordWrap(True)
+        task_layout.addWidget(help_text)
+
         refresh_button = QPushButton("Refresh")
         refresh_button.clicked.connect(self.refresh_tasks)
         task_layout.addWidget(refresh_button)
@@ -142,6 +168,46 @@ class AlfredWindow(QMainWindow):
         self.refresh_tasks()
         self.statusBar().showMessage(f"Saved task #{task_id}.", 5000)
         self.title_input.setFocus()
+
+    def change_task_status(self, action):
+        selected_rows = self.table.selectionModel().selectedRows()
+        if len(selected_rows) != 1:
+            QMessageBox.information(
+                self, "Select one task",
+                "Select exactly one task in the table first."
+            )
+            return
+
+        row = selected_rows[0].row()
+        task_id = int(self.table.item(row, 0).text())
+        title = self.table.item(row, 1).text()
+
+        if action == "submit":
+            answer = QMessageBox.question(
+                self,
+                "Confirm submission",
+                f'Have you actually submitted "{title}"?',
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+
+        try:
+            task = apply_task_action(task_id, action)
+        except ValueError as error:
+            QMessageBox.warning(self, "Cannot change task", str(error))
+            return
+        except sqlite3.Error as error:
+            QMessageBox.critical(self, "Could not update task", str(error))
+            return
+
+        self.refresh_tasks()
+        status = task["status"].replace("_", " ").title()
+        self.statusBar().showMessage(
+            f"Task #{task_id}: {status}", 5000
+        )
 
     def refresh_tasks(self):
         try:
@@ -182,6 +248,12 @@ class AlfredWindow(QMainWindow):
         minutes = sum(task["remaining_minutes"] for task in active)
         ready = sum(
             task["status"] == "ready_to_submit" for task in self.tasks
+        )
+
+        self.submission_notice.setText(
+            f"Submission check: {ready} finished assignment(s) "
+            "still need to be submitted."
+            if ready else ""
         )
 
         self.summary.setText(
