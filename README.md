@@ -29,3 +29,21 @@ Run the tests:
     .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 
 Personal databases are excluded from Git.
+
+## Desktop interface
+
+Alfred uses PySide6 for its desktop interface.
+
+Install dependencies:
+
+    .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+Launch:
+
+    .\.venv\Scripts\python.exe app.py
+
+The interface supports task creation, category filtering,
+and summaries of active tasks and remaining effort.
+Tasks persist in the local SQLite database.
+
+Calendar integration and task status controls are upcoming features.
